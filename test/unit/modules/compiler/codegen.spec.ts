@@ -740,4 +740,98 @@ describe('codegen', () => {
       "\"with(this){return _c('div',[_c('form',[_v(_s(n))])])}\""
     )
   })
+
+  // CVE-2024-6783
+  // class/style codegen data is spliced raw into the generated render
+  // function, so it must only ever be read from the element's own
+  // properties - a polluted Object.prototype must not leak into the
+  // generated code.
+  describe('should not read class/style codegen data from the prototype chain', () => {
+    const pollutedKeys = [
+      'staticClass',
+      'classBinding',
+      'staticStyle',
+      'styleBinding'
+    ]
+
+    afterEach(() => {
+      pollutedKeys.forEach(key => {
+        delete (Object.prototype as any)[key]
+      })
+    })
+
+    function pollute() {
+      const proto = Object.prototype as any
+      proto.staticClass = 'alert(1),xss'
+      proto.classBinding = 'alert(2),xss'
+      proto.staticStyle = 'alert(3),xss'
+      proto.styleBinding = 'alert(4),xss'
+    }
+
+    function compileRender(template: string): string {
+      const ast = parse(template, baseOptions)
+      optimize(ast, baseOptions)
+      return generate(ast, baseOptions).render
+    }
+
+    it('polluted prototype is not injected into the render function', () => {
+      let render = ''
+      try {
+        pollute()
+        render = compileRender('<div id="a">hi</div>')
+      } finally {
+        pollutedKeys.forEach(key => {
+          delete (Object.prototype as any)[key]
+        })
+      }
+      expect(render).not.toContain('alert(')
+      expect(render).not.toContain('xss')
+      expect(render).toBe(
+        `with(this){return _c('div',{attrs:{"id":"a"}},[_v("hi")])}`
+      )
+    })
+
+    it('own class/style properties are still generated', () => {
+      let staticRender = ''
+      let dynamicRender = ''
+      try {
+        pollute()
+        staticRender = compileRender(
+          '<p class="class1" style="color:red">hello world</p>'
+        )
+        dynamicRender = compileRender(
+          '<p :class="class1" :style="error">hello world</p>'
+        )
+      } finally {
+        pollutedKeys.forEach(key => {
+          delete (Object.prototype as any)[key]
+        })
+      }
+      expect(staticRender).toBe(
+        `with(this){return _c('p',{staticClass:"class1",staticStyle:{"color":"red"}},[_v("hello world")])}`
+      )
+      expect(dynamicRender).toBe(
+        `with(this){return _c('p',{class:class1,style:(error)},[_v("hello world")])}`
+      )
+    })
+
+    it('normal class/style codegen is unaffected', () => {
+      assertCodegen(
+        '<p class="class1">hello world</p>',
+        `with(this){return _c('p',{staticClass:"class1"},[_v("hello world")])}`
+      )
+      assertCodegen(
+        '<p :class="class1">hello world</p>',
+        `with(this){return _c('p',{class:class1},[_v("hello world")])}`
+      )
+      assertCodegen(
+        '<p style="color:red">hello world</p>',
+        `with(this){return _c('p',{staticStyle:{"color":"red"}},[_v("hello world")])}`
+      )
+      assertCodegen(
+        '<p :style="error">hello world</p>',
+        `with(this){return _c('p',{style:(error)},[_v("hello world")])}`
+      )
+    })
+  })
 })
