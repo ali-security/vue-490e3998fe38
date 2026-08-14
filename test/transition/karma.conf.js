@@ -21,7 +21,17 @@ module.exports = function (config) {
     esbuild: {
       define
     },
-    browsers: ['ChromeHeadless'],
+    browsers: ['ChromeHeadlessNoSandbox'],
+    customLaunchers: {
+      ChromeHeadlessNoSandbox: {
+        base: 'ChromeHeadless',
+        flags: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage'
+        ]
+      }
+    },
     plugins: ['karma-jasmine', 'karma-esbuild', 'karma-chrome-launcher'],
     singleRun: true
   })

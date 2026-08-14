@@ -1,24 +1,24 @@
 name: 'ci'
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
 jobs:
   unit-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [21, 18]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v4
 
-      - name: Set node version to 18
-        uses: actions/setup-node@v2
+      - name: Set node version to ${{ matrix.node }}
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: ${{ matrix.node }}
           cache: 'pnpm'
 
       - run: pnpm install
@@ -28,16 +28,21 @@ jobs:
 
   ssr-sfc-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [21, 18]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v4
 
-      - name: Set node version to 18
-        uses: actions/setup-node@v2
+      - name: Set node version to ${{ matrix.node }}
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: ${{ matrix.node }}
           cache: 'pnpm'
 
       - run: pnpm install
@@ -50,16 +55,21 @@ jobs:
 
   e2e-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [21, 18]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v4
 
-      - name: Set node version to 18
-        uses: actions/setup-node@v2
+      - name: Set node version to ${{ matrix.node }}
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: ${{ matrix.node }}
           cache: 'pnpm'
 
       - run: pnpm install
@@ -72,16 +82,21 @@ jobs:
 
   type-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [21, 18]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v4
 
-      - name: Set node version to 18
-        uses: actions/setup-node@v2
+      - name: Set node version to ${{ matrix.node }}
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: ${{ matrix.node }}
           cache: 'pnpm'
 
       - run: pnpm install
@@ -91,3 +106,37 @@ jobs:
 
       - name: Run type declaration tests
         run: pnpm run test:types
+
+  pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set node version to 21
+        uses: actions/setup-node@v4
+        with:
+          node-version: 21
+          cache: 'pnpm'
+
+      - run: pnpm install
+
+      - name: Build dist files
+        run: pnpm run build
+
+      - name: Copy LICENSE into vue-template-compiler package
+        run: cp LICENSE packages/template-compiler/LICENSE
+
+      - name: Pack vue-template-compiler
+        run: npm pack
+        working-directory: packages/template-compiler
+
+      - name: Upload vue-template-compiler tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: vue-template-compiler-tarball
+          path: packages/template-compiler/vue-template-compiler-*.tgz
+          if-no-files-found: error
